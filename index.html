@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROSE | Minecraft Vanilla+</title>
+    <style>
+        /* --- 1. CONFIGURACIÓN VISUAL --- */
+        :root {
+            --bg-cream: #F4F1EA;
+            --rose-red: #C42B2B;
+            --rose-dark: #8F1818;
+            --leaf-green: #5D7A50;
+            --text-main: #1D1D1F;
+            --text-light: #86868B;
+            --white: #FFFFFF;
+            --glass: rgba(255, 255, 255, 0.85);
+            
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
+            cursor: none; 
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-cream);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            color: var(--text-main);
+            overflow-x: hidden;
+            width: 100vw;
+            min-height: 100vh;
+            height: 100vh; overflow: hidden;
+        }
+
+        body.loaded { height: auto; overflow-y: auto; overflow-x: hidden; }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 9000;
+        }
+
+        /* --- 2. CURSOR --- */
+        .cursor-dot {
+            position: fixed; width: 8px; height: 8px; background: var(--rose-red);
+            border-radius: 50%; pointer-events: none; z-index: 10000;
+            transform: translate(-50%, -50%); transition: transform 0.05s linear;
+        }
+        .cursor-ring {
+            position: fixed; width: 44px; height: 44px;
+            border: 1px solid rgba(196, 43, 43, 0.3); border-radius: 50%;
+            pointer-events: none; z-index: 9999; transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s, background 0.3s, transform 0.1s ease-out;
+        }
+        body.hover-active .cursor-ring {
+            width: 70px; height: 70px; background: rgba(196, 43, 43, 0.05); border-color: transparent;
+        }
+
+        /* --- 3. CORTINA DE CARGA --- */
+        #intro-curtain {
+            position: fixed; inset: 0; background: var(--bg-cream); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            transition: transform 1s var(--ease-out);
+        }
+        .intro-rose-svg { width: 150px; height: 150px; overflow: visible; }
+        .intro-path {
+            fill: transparent; stroke: var(--rose-red); stroke-width: 2;
+            stroke-dasharray: 600; stroke-dashoffset: 600;
+            transition: stroke-dashoffset 2s ease-in-out, fill 0.5s ease;
+        }
+        .curtain-hidden { transform: translateY(-100%); }
+        .path-drawn { stroke-dashoffset: 0; }
+        .path-filled { fill: var(--rose-red); }
+
+        /* --- 4. NAV --- */
+        nav {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            width: 95%; max-width: 900px; padding: 10px 20px;
+            background: var(--glass); backdrop-filter: blur(20px);
+            border-radius: 100px; border: 1px solid rgba(255,255,255,0.6);
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 1000; opacity: 0; transition: all 1s var(--ease-out);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+        }
+        nav.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        .nav-brand {
+            font-weight: 800; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;
+            color: var(--rose-red); text-decoration: none; text-transform: uppercase;
+        }
+        .nav-menu { display: flex; gap: 6px; }
+        .nav-btn {
+            display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 30px;
+            text-decoration: none; color: var(--text-main); font-size: 0.85rem; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .nav-btn svg { width: 18px; height: 18px; stroke-width: 2; }
+        .nav-btn:hover { background: rgba(0,0,0,0.04); transform: translateY(-2px); }
+        .nav-cta { background: var(--text-main); color: white; }
+        .nav-cta:hover { background: var(--rose-red); color: white; transform: translateY(-2px); }
+
+        /* --- 5. HERO --- */
+        header {
+            min-height: 100vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+            perspective: 1000px;
+        }
+        .rose-visual {
+            width: 320px; height: 320px; margin-bottom: 30px;
+            opacity: 0; transform: scale(0.8) translateY(50px);
+            transition: all 1.5s var(--ease-out) 0.5s;
+            filter: drop-shadow(0 40px 80px rgba(196, 43, 43, 0.2));
+            animation: float 6s ease-in-out infinite;
+        }
+        h1 {
+            font-size: clamp(4rem, 13vw, 11rem); font-weight: 900; line-height: 0.9;
+            letter-spacing: -0.03em; margin-bottom: 20px;
+            opacity: 0; transform: translateY(30px);
+            transition: all 1.2s var(--ease-out) 0.7s;
+        }
+        .hero-desc {
+            font-size: 1.2rem; color: var(--text-light); max-width: 500px;
+            opacity: 0; transform: translateY(30px);
+            transition: all 1.2s var(--ease-out) 0.9s;
+        }
+        body.loaded .rose-visual, body.loaded h1, body.loaded .hero-desc {
+            opacity: 1; transform: translateY(0) scale(1);
+        }
+
+        /* --- 6. CARDS --- */
+        .features { padding: 100px 5%; max-width: 1300px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .card {
+            background: var(--white); border-radius: 32px; padding: 40px;
+            min-height: 380px; display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+            transition: opacity 0.8s, transform 0.8s; opacity: 0; transform: translateY(50px);
+            transform-style: preserve-3d; perspective: 1000px;
+        }
+        .card.in-view { opacity: 1; transform: translateY(0); }
+        .card-content { transform: translateZ(20px); }
+        .icon-box {
+            width: 60px; height: 60px; background: var(--bg-cream); border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px; color: var(--rose-red);
+        }
+        .icon-box svg { width: 32px; height: 32px; }
+
+        /* --- 7. FOOTER SECTION & GARDEN --- */
+        .footer-wrapper {
+            background: linear-gradient(to bottom, var(--white) 0%, #fffbfb 100%);
+            border-radius: 60px 60px 0 0; margin-top: 100px; position: relative; overflow: hidden;
+            box-shadow: 0 -50px 100px rgba(0,0,0,0.02);
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        #garden-canvas {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
+        }
+
+        .cta-section {
+            padding-top: 100px; display: flex; flex-direction: column;
+            align-items: center; text-align: center; position: relative; z-index: 10;
+        }
+
+        /* Animación Descarga */
+        .flower-stage {
+            position: relative; width: 300px; height: 350px;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+        }
+        .growth-svg {
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+            width: 150px; height: 300px; z-index: 1; overflow: visible; pointer-events: none;
+        }
+        .stem-path {
+            fill: none; stroke: var(--leaf-green); stroke-width: 6; stroke-linecap: round;
+            stroke-dasharray: 300; stroke-dashoffset: 300; 
+            transition: stroke-dashoffset 1.5s ease-out;
+        }
+        .rose-head {
+            transform: scale(0); transform-origin: 75px 20px;
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition-delay: 1.2s;
+        }
+
+        .dl-btn {
+            position: relative; width: 300px; height: 80px;
+            background: var(--text-main); color: white; border-radius: 100px;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+            font-size: 1.1rem; font-weight: 700; z-index: 10; letter-spacing: 0.05em;
+            transition: all 0.5s var(--ease-elastic);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+        }
+        .dl-btn:hover { transform: scale(1.05); }
+        .dl-btn.shrunk { width: 80px; background: #5D4037; border-radius: 50%; } 
+        .dl-btn.finished { background: var(--leaf-green); width: 220px; }
+        .btn-content { transition: opacity 0.3s; display: flex; align-items: center; gap: 10px; }
+        .btn-content.hidden { opacity: 0; display: none; }
+        .success-text { position: absolute; opacity: 0; color: white; }
+        .dl-btn.finished .success-text { opacity: 1; }
+
+        /* FOOTER MINIMALISTA */
+        footer {
+            padding: 60px 20px; position: relative; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            margin-top: auto;
+            background: linear-gradient(to top, rgba(255,255,255,0.8), transparent);
+        }
+
+        .minimal-footer {
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+
+        .footer-logo-big {
+            font-size: 3rem; font-weight: 900; color: var(--rose-red);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .footer-logo-big svg { width: 40px; height: 40px; }
+
+        .insta-btn {
+            background: var(--white); color: var(--text-main);
+            padding: 12px 30px; border-radius: 50px;
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 600; text-decoration: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s var(--ease-elastic);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .insta-btn:hover {
+            transform: translateY(-5px) scale(1.05);
+            color: #E1306C;
+            box-shadow: 0 15px 30px rgba(225, 48, 108, 0.15);
+        }
+
+        .copyright {
+            margin-top: 40px; color: var(--text-light); font-size: 0.8rem; opacity: 0.7;
+        }
+
+        @keyframes float { 0%,100% {transform: translateY(0) scale(1);} 50% {transform: translateY(-15px) scale(1.02);} }
+
+        @media(max-width: 768px) {
+            nav { bottom: 20px; top: auto; width: 90%; flex-direction: column; padding: 15px; }
+            .nav-menu { width: 100%; justify-content: space-around; margin-top: 10px; }
+            h1 { font-size: 16vw; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <div class="cursor-dot"></div>
+    <div class="cursor-ring"></div>
+
+    <!-- INTRO -->
+    <div id="intro-curtain">
+        <svg class="intro-rose-svg" viewBox="0 0 100 100">
+            <path class="intro-path" d="M50 20 C20 20 10 50 30 80 C50 100 80 80 90 50 C80 20 70 20 50 20 Z M50 20 Q50 60 30 50 M50 20 Q50 60 70 50" />
+        </svg>
+    </div>
+
+    <!-- NAV -->
+    <nav id="navbar">
+        <a href="#" class="nav-brand interactable">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+            ROSE
+        </a>
+        <div class="nav-menu">
+            <a onclick="smoothScroll('top')" class="nav-btn interactable">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Inicio
+            </a>
+            <a onclick="smoothScroll('features')" class="nav-btn interactable">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                Explorar
+            </a>
+            <a onclick="smoothScroll('download')" class="nav-btn nav-cta interactable">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Descargar
+            </a>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <header id="top">
+        <div class="rose-visual">
+            <svg viewBox="0 0 200 200" width="100%" height="100%">
+                <g transform="translate(100, 100) scale(0.9)">
+                    <path fill="#5D7A50" d="M-60 40 Q-90 80 -50 100 Q-20 90 -40 40 Z" />
+                    <path fill="#5D7A50" d="M60 40 Q90 80 50 100 Q20 90 40 40 Z" />
+                    <path fill="#C42B2B" d="M0 -70 C-50 -70 -80 0 -40 50 C0 80 40 50 80 0 C120 -80 50 -70 0 -70 Z" />
+                    <path fill="none" stroke="#F4F1EA" stroke-width="3" stroke-linecap="round" d="M-30 -20 Q0 20 30 -20" />
+                    <path fill="none" stroke="#F4F1EA" stroke-width="3" stroke-linecap="round" d="M0 -50 Q40 -20 30 20" />
+                </g>
+            </svg>
+        </div>
+        <h1>ROSE</h1>
+        <p class="hero-desc">La evolución natural de Minecraft. Sin lag. Solo belleza.</p>
+    </header>
+
+    <!-- FEATURES -->
+    <section id="features" class="features">
+        <div class="grid">
+            <div class="card tilt-card interactable">
+                <div class="card-content">
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    </div>
+                    <h3>Rendimiento</h3>
+                    <p>Mods que mejoran el rendimiento, mejorando tu patata.</p>
+                </div>
+            </div>
+            <div class="card tilt-card interactable">
+                <div class="card-content">
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3"></path></svg>
+                    </div>
+                    <h3>Naturaleza</h3>
+                    <p>Biomas mejorados, estructuras mejoradas, y nuevos mobs, para que no te aburras como tu ex lo hizo contigo.</p>
+                </div>
+            </div>
+            <div class="card tilt-card interactable">
+                <div class="card-content">
+                    <div class="icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                    </div>
+                    <h3>Sonidos</h3>
+                    <p>Ambiente mejorado para hacerte sentir querido y vivo, no como tu relación.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER WITH CANVAS GARDEN -->
+    <div id="download" class="footer-wrapper">
+        <canvas id="garden-canvas"></canvas>
+
+        <div class="cta-section">
+            <h2 style="font-size: 3rem; margin-bottom: 20px; font-weight:800;">Florece ahora.</h2>
+            
+            <div class="flower-stage">
+                <svg class="growth-svg" viewBox="0 0 150 300">
+                    <path class="stem-path" d="M75 300 Q75 200 75 100" />
+                    <path class="stem-path" d="M75 200 Q50 180 30 150" stroke-width="4" style="stroke-dasharray:100; stroke-dashoffset:100; transition-delay:0.5s;" />
+                    <path class="stem-path" d="M75 160 Q100 140 120 110" stroke-width="4" style="stroke-dasharray:100; stroke-dashoffset:100; transition-delay:0.8s;" />
+                    <g class="rose-head">
+                        <path fill="#C42B2B" d="M75 20 C50 20 30 60 50 100 C60 120 90 120 100 100 C120 60 100 20 75 20 Z" />
+                        <path fill="none" stroke="#fff" stroke-width="2" d="M65 50 Q75 80 85 50" />
+                    </g>
+                </svg>
+
+                <button class="dl-btn interactable" id="downloadBtn">
+                    <div class="btn-content">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="24" height="24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>DESCARGAR MODPACK</span>
+                    </div>
+                    <span class="success-text">¡INSTALADO!</span>
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <div class="minimal-footer">
+                <div class="footer-logo-big">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+                    ROSE
+                </div>
+                
+                <a href="https://instagram.com/img.yahir" target="_blank" class="insta-btn interactable">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                    @img.yahir
+                </a>
+                
+                <div class="copyright">© 2026 Rose Modpack Project</div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 1. INTRO
+        window.addEventListener('load', () => {
+            const path = document.querySelector('.intro-path');
+            setTimeout(() => { path.classList.add('path-drawn'); }, 500);
+            setTimeout(() => { path.classList.add('path-filled'); }, 2000);
+            setTimeout(() => {
+                document.getElementById('intro-curtain').classList.add('curtain-hidden');
+                document.body.classList.add('loaded');
+                document.getElementById('navbar').classList.add('visible');
+                initGarden();
+            }, 2500);
+        });
+
+        // 2. CURSOR
+        const cursorDot = document.querySelector('.cursor-dot');
+        const cursorRing = document.querySelector('.cursor-ring');
+        window.addEventListener('mousemove', (e) => {
+            const x = e.clientX; const y = e.clientY;
+            cursorDot.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+            setTimeout(() => { cursorRing.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; }, 60);
+        });
+        document.querySelectorAll('.interactable').forEach(el => {
+            el.addEventListener('mouseenter', () => document.body.classList.add('hover-active'));
+            el.addEventListener('mouseleave', () => document.body.classList.remove('hover-active'));
+        });
+
+        // 3. SMOOTH SCROLL
+        function smoothScroll(targetId) {
+            const target = document.getElementById(targetId);
+            const startPos = window.pageYOffset;
+            const targetPos = target.getBoundingClientRect().top + startPos;
+            const distance = targetPos - startPos;
+            let startTime = null; const duration = 1200;
+            function anim(currentTime) {
+                if(!startTime) startTime = currentTime;
+                const timeElapsed = currentTime - startTime;
+                const run = easeOutCubic(timeElapsed, startPos, distance, duration);
+                window.scrollTo(0, run);
+                if(timeElapsed < duration) requestAnimationFrame(anim);
+            }
+            function easeOutCubic(t, b, c, d) { t /= d; t--; return c * (t*t*t + 1) + b; }
+            requestAnimationFrame(anim);
+        }
+
+        // 4. TILT
+        const cards = document.querySelectorAll('.tilt-card');
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+                const centerX = rect.width / 2; const centerY = rect.height / 2;
+                const rotateX = ((y - centerY) / centerY) * -8;
+                const rotateY = ((x - centerX) / centerX) * 8;
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = `perspective(1000px) rotateX(0) rotateY(0) scale(1)`;
+            });
+        });
+
+        // 5. BLOOM DOWNLOAD
+        const dlBtn = document.getElementById('downloadBtn');
+        const btnContent = document.querySelector('.btn-content');
+        const stems = document.querySelectorAll('.stem-path');
+        const roseHead = document.querySelector('.rose-head');
+        let downloading = false;
+
+        dlBtn.addEventListener('click', () => {
+            if(downloading) return;
+            downloading = true;
+            btnContent.classList.add('hidden');
+            dlBtn.classList.add('shrunk');
+            setTimeout(() => { stems.forEach(stem => { stem.style.strokeDashoffset = '0'; }); }, 500);
+            setTimeout(() => { roseHead.style.transform = 'scale(1)'; }, 1800);
+            setTimeout(() => { dlBtn.classList.remove('shrunk'); dlBtn.classList.add('finished'); }, 2500);
+        });
+
+        // 6. OBSERVER
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => { if(entry.isIntersecting) entry.target.classList.add('in-view'); });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.card').forEach(c => observer.observe(c));
+
+        // 7. CANVAS GARDEN
+        function initGarden() {
+            const canvas = document.getElementById('garden-canvas');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let flowers = [];
+
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+                createFlowers();
+            }
+
+            function createFlowers() {
+                flowers = [];
+                const count = Math.floor(width / 20); // Less density for cleaner look
+                for(let i=0; i<count; i++) {
+                    flowers.push({
+                        x: Math.random() * width,
+                        y: height + 20,
+                        stemHeight: Math.random() * 100 + 60,
+                        color: Math.random() > 0.8 ? '#8F1818' : '#C42B2B',
+                        speed: Math.random() * 0.002 + 0.001,
+                        offset: Math.random() * Math.PI * 2,
+                        size: Math.random() * 5 + 3
+                    });
+                }
+            }
+
+            function draw(time) {
+                ctx.clearRect(0, 0, width, height);
+                flowers.forEach(f => {
+                    const sway = Math.sin(time * 0.002 + f.offset) * 15;
+                    ctx.beginPath();
+                    ctx.moveTo(f.x, f.y);
+                    ctx.quadraticCurveTo(f.x + sway/2, f.y - f.stemHeight/2, f.x + sway, f.y - f.stemHeight);
+                    ctx.strokeStyle = '#5D7A50';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(f.x + sway, f.y - f.stemHeight, f.size, 0, Math.PI * 2);
+                    ctx.fillStyle = f.color;
+                    ctx.fill();
+                });
+                requestAnimationFrame(draw);
+            }
+            window.addEventListener('resize', resize);
+            resize();
+            requestAnimationFrame(draw);
+        }
+    </script>
+</body>
+</html>
